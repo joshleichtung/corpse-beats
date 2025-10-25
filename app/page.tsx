@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,24 +18,37 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const isGeneratingRef = useRef(false); // Prevent double-clicks
   const audioRefs = useRef<Map<number, HTMLAudioElement>>(new Map());
+  const pendingAdvanceRef = useRef<number | null>(null);
 
-  // Auto-scroll carousel to the latest round when new round completes
-  useEffect(() => {
-    if (carouselApi && allRounds.length > 0 && !isGenerating) {
-      const targetSlide = allRounds.length - 1;
-      carouselApi.scrollTo(targetSlide);
-
-      // Auto-play the latest round's audio after a brief delay
-      setTimeout(() => {
-        const latestAudio = audioRefs.current.get(targetSlide);
-        if (latestAudio) {
-          latestAudio.play().catch(err => console.log("Audio play failed:", err));
-        }
-      }, 500);
+  // Advance to a specific round and start playing
+  const advanceToRound = useCallback((roundIndex: number) => {
+    if (carouselApi) {
+      carouselApi.scrollTo(roundIndex);
+      pendingAdvanceRef.current = null;
     }
-  }, [allRounds.length, carouselApi, isGenerating]);
+  }, [carouselApi]);
+
+  // When a new round completes, queue it for playback
+  useEffect(() => {
+    if (carouselApi && allRounds.length > 0) {
+      const latestRound = allRounds.length - 1;
+      const currentRound = carouselApi.selectedScrollSnap();
+
+      // If we're not on the latest round
+      if (currentRound < latestRound) {
+        // If audio is playing, queue the latest round for when it finishes
+        if (isAudioPlaying) {
+          pendingAdvanceRef.current = latestRound;
+        } else {
+          // No audio playing, advance immediately
+          advanceToRound(latestRound);
+        }
+      }
+    }
+  }, [allRounds.length, carouselApi, isAudioPlaying, advanceToRound]);
 
   // Track current carousel slide and handle audio playback
   useEffect(() => {
@@ -64,12 +77,27 @@ export default function Home() {
     };
   }, [carouselApi]);
 
-  // Auto-advance to next round when audio ends
-  const handleAudioEnded = (roundIndex: number) => {
-    // If there's a next round, advance to it
-    if (carouselApi && roundIndex < allRounds.length - 1) {
+  // When audio ends, check if there's a pending round or advance to next
+  const handleAudioEnded = useCallback((roundIndex: number) => {
+    setIsAudioPlaying(false);
+
+    // If there's a pending round (newer round completed while playing), go there
+    if (pendingAdvanceRef.current !== null) {
+      advanceToRound(pendingAdvanceRef.current);
+    }
+    // Otherwise, advance to next round if it exists
+    else if (carouselApi && roundIndex < allRounds.length - 1) {
       carouselApi.scrollTo(roundIndex + 1);
     }
+  }, [carouselApi, allRounds.length, advanceToRound]);
+
+  // Track when audio starts/stops playing
+  const handleAudioPlay = () => {
+    setIsAudioPlaying(true);
+  };
+
+  const handleAudioPause = () => {
+    setIsAudioPlaying(false);
   };
 
   const EXAMPLE_PROMPTS = [
@@ -313,6 +341,8 @@ export default function Home() {
                             controls
                             src={sample.audioUrl}
                             className="w-full h-10"
+                            onPlay={handleAudioPlay}
+                            onPause={handleAudioPause}
                             onEnded={() => handleAudioEnded(roundIdx)}
                           >
                             Your browser does not support audio.
