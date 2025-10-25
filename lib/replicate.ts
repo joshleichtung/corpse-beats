@@ -127,7 +127,7 @@ export async function generateImage(
 ): Promise<ImageGenerationOutput> {
   return withRetry(async () => {
     const output = await replicate.run(
-      "black-forest-labs/flux-schnell:latest",
+      "black-forest-labs/flux-schnell:c846a69991daf4c0e5d016514849d14ee5b2e6846ce6b9d6f21369e564cfe51e",
       {
         input: {
           prompt,
@@ -150,7 +150,7 @@ export async function generateImage(
 export async function captionImage(imageUrl: string): Promise<ImageCaptionOutput> {
   return withRetry(async () => {
     const output = await replicate.run(
-      "salesforce/blip:latest",
+      "salesforce/blip:2e1dddc8621f72155f24cf2e0adbde548458d3cab9f00c0139eea840d0ac4746",
       {
         input: {
           image: imageUrl,
