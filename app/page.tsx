@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { generateSampleViaAPI, type GenerationResult } from "@/lib/generation-chain";
+import { generateSampleViaAPI, type GenerationResult } from "@/lib/generation-client";
 import { getRoundName, getRoundColor } from "@/lib/corruption";
 
 export default function Home() {
