@@ -1,0 +1,181 @@
+import Replicate from "replicate";
+
+// Initialize Replicate client
+const replicate = new Replicate({
+  auth: process.env.REPLICATE_API_TOKEN,
+});
+
+// TypeScript types for API responses
+export interface AudioGenerationOutput {
+  audio_url: string;
+  duration?: number;
+}
+
+export interface ImageGenerationOutput {
+  image_url: string;
+}
+
+export interface ImageCaptionOutput {
+  caption: string;
+}
+
+export interface GenerationMetadata {
+  model: string;
+  version?: string;
+  input: Record<string, unknown>;
+  timestamp: number;
+}
+
+// Retry configuration
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  initialDelayMs: 1000,
+  maxDelayMs: 10000,
+  backoffMultiplier: 2,
+};
+
+/**
+ * Exponential backoff delay calculation
+ */
+function calculateBackoffDelay(attempt: number): number {
+  const delay = Math.min(
+    RETRY_CONFIG.initialDelayMs * Math.pow(RETRY_CONFIG.backoffMultiplier, attempt),
+    RETRY_CONFIG.maxDelayMs
+  );
+  // Add jitter to prevent thundering herd
+  return delay + Math.random() * 1000;
+}
+
+/**
+ * Sleep utility for retry delays
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Generic retry wrapper with exponential backoff
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  context: string
+): Promise<T> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < RETRY_CONFIG.maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+
+      // Don't retry on authentication errors
+      if (error instanceof Error && error.message.includes("authentication")) {
+        throw error;
+      }
+
+      if (attempt < RETRY_CONFIG.maxRetries - 1) {
+        const delay = calculateBackoffDelay(attempt);
+        console.warn(
+          `${context} failed (attempt ${attempt + 1}/${RETRY_CONFIG.maxRetries}). ` +
+          `Retrying in ${Math.round(delay)}ms...`,
+          error
+        );
+        await sleep(delay);
+      }
+    }
+  }
+
+  throw new Error(
+    `${context} failed after ${RETRY_CONFIG.maxRetries} attempts. ` +
+    `Last error: ${lastError?.message}`
+  );
+}
+
+/**
+ * Generate audio from text prompt using Lyria-2
+ */
+export async function generateAudio(
+  prompt: string,
+  corruptionLevel: number = 0
+): Promise<AudioGenerationOutput> {
+  return withRetry(async () => {
+    const output = await replicate.run(
+      "google/lyria-2:latest",
+      {
+        input: {
+          prompt,
+          duration: 8, // 8-second samples for hackathon speed
+          temperature: 0.7 + (corruptionLevel * 0.3), // Increase randomness with corruption
+        },
+      }
+    ) as unknown as string;
+
+    // Lyria-2 returns audio URL directly as string
+    return {
+      audio_url: output,
+    };
+  }, `Audio generation for prompt: "${prompt}"`);
+}
+
+/**
+ * Generate image from audio-inspired prompt using Flux Schnell
+ */
+export async function generateImage(
+  prompt: string,
+  corruptionLevel: number = 0
+): Promise<ImageGenerationOutput> {
+  return withRetry(async () => {
+    const output = await replicate.run(
+      "black-forest-labs/flux-schnell:latest",
+      {
+        input: {
+          prompt,
+          num_inference_steps: corruptionLevel < 0.5 ? 1 : 4, // Faster for early rounds
+          aspect_ratio: "1:1", // Square for grid display
+        },
+      }
+    ) as string[];
+
+    // Flux returns array of image URLs
+    return {
+      image_url: output[0],
+    };
+  }, `Image generation for prompt: "${prompt}"`);
+}
+
+/**
+ * Generate caption from image using BLIP
+ */
+export async function captionImage(imageUrl: string): Promise<ImageCaptionOutput> {
+  return withRetry(async () => {
+    const output = await replicate.run(
+      "salesforce/blip:latest",
+      {
+        input: {
+          image: imageUrl,
+          task: "image_captioning",
+        },
+      }
+    ) as unknown as string;
+
+    return {
+      caption: output,
+    };
+  }, `Image captioning for: ${imageUrl}`);
+}
+
+/**
+ * Health check: verify Replicate API connection
+ */
+export async function healthCheck(): Promise<boolean> {
+  try {
+    // Simple test: list available models (lightweight operation)
+    const models = await replicate.models.list();
+    return models !== null;
+  } catch (error) {
+    console.error("Replicate health check failed:", error);
+    return false;
+  }
+}
+
+export { replicate };
