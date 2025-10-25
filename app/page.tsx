@@ -10,6 +10,13 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedAudio, setGeneratedAudio] = useState<{url: string, prompt: string} | null>(null);
   const [generatedImage, setGeneratedImage] = useState<{url: string, prompt: string} | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const EXAMPLE_PROMPTS = [
+    "cheerful music box melody",
+    "haunting lullaby in minor key",
+    "bright carnival waltz",
+  ];
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
@@ -17,6 +24,7 @@ export default function Home() {
     setIsGenerating(true);
     setGeneratedAudio(null);
     setGeneratedImage(null);
+    setError(null);
 
     try {
       // Call both APIs in parallel for speed
@@ -35,12 +43,12 @@ export default function Home() {
 
       // Check for errors
       if (!audioResponse.ok) {
-        const error = await audioResponse.json();
-        throw new Error(error.error || "Failed to generate audio");
+        const errorData = await audioResponse.json();
+        throw new Error(errorData.error || "Failed to generate audio");
       }
       if (!imageResponse.ok) {
-        const error = await imageResponse.json();
-        throw new Error(error.error || "Failed to generate image");
+        const errorData = await imageResponse.json();
+        throw new Error(errorData.error || "Failed to generate image");
       }
 
       // Parse results
@@ -58,12 +66,17 @@ export default function Home() {
         url: imageData.image_url,
         prompt: prompt.trim(),
       });
-    } catch (error) {
-      console.error("Generation failed:", error);
-      alert(error instanceof Error ? error.message : "Generation failed");
+    } catch (err) {
+      console.error("Generation failed:", err);
+      setError(err instanceof Error ? err.message : "Generation failed");
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleExampleClick = (example: string) => {
+    setPrompt(example);
+    setError(null);
   };
 
   return (
@@ -111,11 +124,62 @@ export default function Home() {
           </div>
           {isGenerating && (
             <p className="text-sm text-muted-foreground mt-4 animate-pulse">
-              Starting the decay process...
+              Generating audio and image... this may take 20-30 seconds
             </p>
+          )}
+          {!isGenerating && !generatedAudio && (
+            <div className="mt-4">
+              <p className="text-xs text-muted-foreground mb-2">Try an example:</p>
+              <div className="flex flex-wrap gap-2">
+                {EXAMPLE_PROMPTS.map((example) => (
+                  <button
+                    key={example}
+                    onClick={() => handleExampleClick(example)}
+                    className="text-xs px-3 py-1 rounded-full bg-muted hover:bg-muted/80 transition-colors"
+                  >
+                    {example}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Error Display */}
+      {error && (
+        <Card className="max-w-2xl w-full mb-8 border-destructive bg-destructive/10">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <svg
+                className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <div className="flex-1">
+                <p className="font-medium text-destructive">Generation failed</p>
+                <p className="text-sm text-destructive/80 mt-1">{error}</p>
+              </div>
+              <button
+                onClick={() => setError(null)}
+                className="text-destructive hover:text-destructive/80"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Output Display */}
       <div className="max-w-4xl w-full">
