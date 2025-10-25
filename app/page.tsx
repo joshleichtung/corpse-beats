@@ -60,17 +60,14 @@ export default function Home() {
       const newIndex = carouselApi.selectedScrollSnap();
       setCurrentSlideIndex(newIndex);
 
-      // Stop all audio
+      // Stop all audio when navigating
       audioRefs.current.forEach((audio) => {
         audio.pause();
         audio.currentTime = 0;
       });
 
-      // Play audio for current slide
-      const currentAudio = audioRefs.current.get(newIndex);
-      if (currentAudio) {
-        currentAudio.play().catch(err => console.log("Audio play failed:", err));
-      }
+      // Don't auto-play on manual navigation - let user click play
+      setIsAudioPlaying(false);
     };
 
     carouselApi.on("select", onSelect);
