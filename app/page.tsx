@@ -17,14 +17,60 @@ export default function Home() {
   const [allRounds, setAllRounds] = useState<GenerationResult[][]>([]);
   const [error, setError] = useState<string | null>(null);
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const isGeneratingRef = useRef(false); // Prevent double-clicks
+  const audioRefs = useRef<Map<number, HTMLAudioElement>>(new Map());
 
-  // Auto-scroll carousel to the latest round
+  // Auto-scroll carousel to the latest round when new round completes
   useEffect(() => {
-    if (carouselApi && allRounds.length > 0) {
-      carouselApi.scrollTo(allRounds.length - 1);
+    if (carouselApi && allRounds.length > 0 && !isGenerating) {
+      const targetSlide = allRounds.length - 1;
+      carouselApi.scrollTo(targetSlide);
+
+      // Auto-play the latest round's audio after a brief delay
+      setTimeout(() => {
+        const latestAudio = audioRefs.current.get(targetSlide);
+        if (latestAudio) {
+          latestAudio.play().catch(err => console.log("Audio play failed:", err));
+        }
+      }, 500);
     }
-  }, [allRounds.length, carouselApi]);
+  }, [allRounds.length, carouselApi, isGenerating]);
+
+  // Track current carousel slide and handle audio playback
+  useEffect(() => {
+    if (!carouselApi) return;
+
+    const onSelect = () => {
+      const newIndex = carouselApi.selectedScrollSnap();
+      setCurrentSlideIndex(newIndex);
+
+      // Stop all audio
+      audioRefs.current.forEach((audio) => {
+        audio.pause();
+        audio.currentTime = 0;
+      });
+
+      // Play audio for current slide
+      const currentAudio = audioRefs.current.get(newIndex);
+      if (currentAudio) {
+        currentAudio.play().catch(err => console.log("Audio play failed:", err));
+      }
+    };
+
+    carouselApi.on("select", onSelect);
+    return () => {
+      carouselApi.off("select", onSelect);
+    };
+  }, [carouselApi]);
+
+  // Auto-advance to next round when audio ends
+  const handleAudioEnded = (roundIndex: number) => {
+    // If there's a next round, advance to it
+    if (carouselApi && roundIndex < allRounds.length - 1) {
+      carouselApi.scrollTo(roundIndex + 1);
+    }
+  };
 
   const EXAMPLE_PROMPTS = [
     "cheerful music box melody",
@@ -261,10 +307,13 @@ export default function Home() {
 
                           {/* Audio */}
                           <audio
+                            ref={(el) => {
+                              if (el) audioRefs.current.set(roundIdx, el);
+                            }}
                             controls
-                            autoPlay
                             src={sample.audioUrl}
                             className="w-full h-10"
+                            onEnded={() => handleAudioEnded(roundIdx)}
                           >
                             Your browser does not support audio.
                           </audio>
