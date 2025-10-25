@@ -92,7 +92,7 @@ async function withRetry<T>(
 }
 
 /**
- * Generate audio from text prompt using Lyria-2
+ * Generate audio from text prompt using MusicGen
  */
 export async function generateAudio(
   prompt: string,
@@ -100,17 +100,19 @@ export async function generateAudio(
 ): Promise<AudioGenerationOutput> {
   return withRetry(async () => {
     const output = await replicate.run(
-      "google/lyria-2:latest",
+      "meta/musicgen:671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb",
       {
         input: {
           prompt,
           duration: 8, // 8-second samples for hackathon speed
-          temperature: 0.7 + (corruptionLevel * 0.3), // Increase randomness with corruption
+          model_version: "stereo-large",
+          output_format: "mp3",
+          normalization_strategy: "peak",
         },
       }
     ) as unknown as string;
 
-    // Lyria-2 returns audio URL directly as string
+    // MusicGen returns audio URL directly as string
     return {
       audio_url: output,
     };

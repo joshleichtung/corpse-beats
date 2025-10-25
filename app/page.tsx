@@ -39,8 +39,9 @@ export default function Home() {
         setCurrentRound(round);
 
         // Generate samples sequentially to avoid rate limits
+        // TODO: Change back to 4 for production, using 1 for testing
         const roundSamples: GenerationResult[] = [];
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 1; i++) {
           try {
             const sample = await generateSampleViaAPI(currentPrompt, round);
             roundSamples.push(sample);
@@ -162,7 +163,7 @@ export default function Home() {
               </div>
               <Progress value={progress} className="h-2" />
               <p className="text-xs text-muted-foreground">
-                Generating 4 samples... this takes ~30 seconds per round
+                Generating sample... this takes ~30-45 seconds per round
               </p>
             </div>
           )}
@@ -236,7 +237,7 @@ export default function Home() {
                   <h3 className="text-2xl font-bold">{getRoundName(roundIdx)}</h3>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   {roundSamples.map((sample, sampleIdx) => (
                     <Card key={sampleIdx} className="border-2">
                       <CardHeader className="pb-3">
