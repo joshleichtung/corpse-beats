@@ -8,37 +8,59 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedAudio, setGeneratedAudio] = useState<{url: string, prompt: string} | null>(null);
   const [generatedImage, setGeneratedImage] = useState<{url: string, prompt: string} | null>(null);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
 
     setIsGenerating(true);
+    setGeneratedAudio(null);
     setGeneratedImage(null);
 
     try {
-      // Call image generation API
-      const response = await fetch("/api/generate-image", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ prompt: prompt.trim() }),
-      });
+      // Call both APIs in parallel for speed
+      const [audioResponse, imageResponse] = await Promise.all([
+        fetch("/api/generate-audio", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: prompt.trim() }),
+        }),
+        fetch("/api/generate-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: prompt.trim() }),
+        }),
+      ]);
 
-      if (!response.ok) {
-        const error = await response.json();
+      // Check for errors
+      if (!audioResponse.ok) {
+        const error = await audioResponse.json();
+        throw new Error(error.error || "Failed to generate audio");
+      }
+      if (!imageResponse.ok) {
+        const error = await imageResponse.json();
         throw new Error(error.error || "Failed to generate image");
       }
 
-      const data = await response.json();
+      // Parse results
+      const [audioData, imageData] = await Promise.all([
+        audioResponse.json(),
+        imageResponse.json(),
+      ]);
+
+      // Update state with both results
+      setGeneratedAudio({
+        url: audioData.audio_url,
+        prompt: prompt.trim(),
+      });
       setGeneratedImage({
-        url: data.image_url,
+        url: imageData.image_url,
         prompt: prompt.trim(),
       });
     } catch (error) {
       console.error("Generation failed:", error);
-      alert(error instanceof Error ? error.message : "Failed to generate image");
+      alert(error instanceof Error ? error.message : "Generation failed");
     } finally {
       setIsGenerating(false);
     }
@@ -97,25 +119,47 @@ export default function Home() {
 
       {/* Output Display */}
       <div className="max-w-4xl w-full">
-        {generatedImage ? (
-          <Card className="border-2 shadow-lg">
-            <CardHeader>
-              <CardTitle>Generated Image</CardTitle>
-              <CardDescription className="text-sm italic">
-                &quot;{generatedImage.prompt}&quot;
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-muted">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={generatedImage.url}
-                  alt={generatedImage.prompt}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            </CardContent>
-          </Card>
+        {generatedAudio && generatedImage ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Audio Output */}
+            <Card className="border-2 shadow-lg">
+              <CardHeader>
+                <CardTitle>Generated Audio</CardTitle>
+                <CardDescription className="text-sm italic">
+                  &quot;{generatedAudio.prompt}&quot;
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <audio
+                  controls
+                  src={generatedAudio.url}
+                  className="w-full"
+                >
+                  Your browser does not support the audio element.
+                </audio>
+              </CardContent>
+            </Card>
+
+            {/* Image Output */}
+            <Card className="border-2 shadow-lg">
+              <CardHeader>
+                <CardTitle>Generated Image</CardTitle>
+                <CardDescription className="text-sm italic">
+                  &quot;{generatedImage.prompt}&quot;
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-muted">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={generatedImage.url}
+                    alt={generatedImage.prompt}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         ) : (
           <Card className="border-dashed border-2 bg-muted/10">
             <CardContent className="p-12 text-center">
