@@ -38,16 +38,35 @@ export default function Home() {
       for (let round = 0; round < 4; round++) {
         setCurrentRound(round);
 
-        // Generate 4 samples for this round in parallel
-        const roundSamples = await Promise.all([
-          generateSampleViaAPI(currentPrompt, round),
-          generateSampleViaAPI(currentPrompt, round),
-          generateSampleViaAPI(currentPrompt, round),
-          generateSampleViaAPI(currentPrompt, round),
-        ]);
+        // Generate samples sequentially to avoid rate limits
+        const roundSamples: GenerationResult[] = [];
+        for (let i = 0; i < 4; i++) {
+          try {
+            const sample = await generateSampleViaAPI(currentPrompt, round);
+            roundSamples.push(sample);
+
+            // Update UI progressively as each sample completes
+            const updatedRounds = [...rounds];
+            updatedRounds[round] = [...roundSamples];
+            setAllRounds(updatedRounds);
+
+            // Small delay to avoid rate limits (500ms between samples)
+            if (i < 3) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          } catch (err) {
+            console.error(`Failed to generate sample ${i + 1}:`, err);
+            // Continue with other samples even if one fails
+          }
+        }
+
+        // Only continue if we got at least one sample
+        if (roundSamples.length === 0) {
+          throw new Error(`Round ${round + 1} failed - no samples generated`);
+        }
 
         rounds.push(roundSamples);
-        setAllRounds([...rounds]); // Update UI progressively
+        setAllRounds([...rounds]); // Final update for this round
 
         // Use first sample's caption for next round (exquisite corpse)
         if (round < 3 && roundSamples[0]) {

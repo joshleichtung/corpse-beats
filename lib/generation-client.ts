@@ -17,6 +17,7 @@ export interface GenerationResult {
 /**
  * Client-side API wrapper for single sample generation
  * Calls the API endpoints instead of using Replicate directly
+ * Includes retry logic for rate limits
  */
 export async function generateSampleViaAPI(
   prompt: string,
@@ -25,47 +26,88 @@ export async function generateSampleViaAPI(
   // Enhance prompt client-side
   const audioPrompt = enhanceAudioPrompt(prompt, round);
 
-  // Call APIs in parallel
-  const [audioResponse, imageResponse] = await Promise.all([
-    fetch("/api/generate-audio", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: audioPrompt }),
-    }),
-    fetch("/api/generate-image", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: audioPrompt }),
-    }),
-  ]);
+  // Retry configuration
+  const maxRetries = 3;
+  let lastError: Error | null = null;
 
-  if (!audioResponse.ok || !imageResponse.ok) {
-    throw new Error("Generation failed");
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // Call APIs sequentially to reduce rate limit pressure
+      const audioResponse = await fetch("/api/generate-audio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: audioPrompt }),
+      });
+
+      if (!audioResponse.ok) {
+        if (audioResponse.status === 429 && attempt < maxRetries - 1) {
+          // Rate limit - wait and retry
+          await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
+          continue;
+        }
+        const errorData = await audioResponse.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(errorData.error || "Audio generation failed");
+      }
+
+      const audioData = await audioResponse.json();
+
+      // Small delay before image generation
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const imageResponse = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: audioPrompt }),
+      });
+
+      if (!imageResponse.ok) {
+        if (imageResponse.status === 429 && attempt < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
+          continue;
+        }
+        const errorData = await imageResponse.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(errorData.error || "Image generation failed");
+      }
+
+      const imageData = await imageResponse.json();
+
+      // Small delay before captioning
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Caption the generated image
+      const captionResponse = await fetch("/api/caption-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: imageData.image_url }),
+      });
+
+      if (!captionResponse.ok) {
+        if (captionResponse.status === 429 && attempt < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
+          continue;
+        }
+        const errorData = await captionResponse.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(errorData.error || "Caption generation failed");
+      }
+
+      const captionData = await captionResponse.json();
+
+      return {
+        audioUrl: audioData.audio_url,
+        imageUrl: imageData.image_url,
+        caption: captionData.caption,
+        prompt: audioPrompt,
+        round,
+      };
+    } catch (err) {
+      lastError = err as Error;
+      if (attempt < maxRetries - 1) {
+        console.log(`Attempt ${attempt + 1} failed, retrying...`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+        continue;
+      }
+    }
   }
 
-  const [audioData, imageData] = await Promise.all([
-    audioResponse.json(),
-    imageResponse.json(),
-  ]);
-
-  // Caption the generated image
-  const captionResponse = await fetch("/api/caption-image", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ imageUrl: imageData.image_url }),
-  });
-
-  if (!captionResponse.ok) {
-    throw new Error("Caption generation failed");
-  }
-
-  const captionData = await captionResponse.json();
-
-  return {
-    audioUrl: audioData.audio_url,
-    imageUrl: imageData.image_url,
-    caption: captionData.caption,
-    prompt: audioPrompt,
-    round,
-  };
+  throw lastError || new Error("Generation failed after retries");
 }
