@@ -255,6 +255,7 @@ export default function Home() {
                         {/* Audio */}
                         <audio
                           controls
+                          autoPlay
                           src={sample.audioUrl}
                           className="w-full h-8"
                         >
