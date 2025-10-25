@@ -4,12 +4,16 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { generateSampleViaAPI, type GenerationResult } from "@/lib/generation-chain";
+import { getRoundName, getRoundColor } from "@/lib/corruption";
 
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedAudio, setGeneratedAudio] = useState<{url: string, prompt: string} | null>(null);
-  const [generatedImage, setGeneratedImage] = useState<{url: string, prompt: string} | null>(null);
+  const [currentRound, setCurrentRound] = useState<number | null>(null);
+  const [allRounds, setAllRounds] = useState<GenerationResult[][]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const EXAMPLE_PROMPTS = [
@@ -22,53 +26,40 @@ export default function Home() {
     if (!prompt.trim()) return;
 
     setIsGenerating(true);
-    setGeneratedAudio(null);
-    setGeneratedImage(null);
+    setAllRounds([]);
     setError(null);
+    setCurrentRound(0);
 
     try {
-      // Call both APIs in parallel for speed
-      const [audioResponse, imageResponse] = await Promise.all([
-        fetch("/api/generate-audio", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: prompt.trim() }),
-        }),
-        fetch("/api/generate-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: prompt.trim() }),
-        }),
-      ]);
+      const rounds: GenerationResult[][] = [];
+      let currentPrompt = prompt.trim();
 
-      // Check for errors
-      if (!audioResponse.ok) {
-        const errorData = await audioResponse.json();
-        throw new Error(errorData.error || "Failed to generate audio");
+      // Generate 4 rounds of corruption
+      for (let round = 0; round < 4; round++) {
+        setCurrentRound(round);
+
+        // Generate 4 samples for this round in parallel
+        const roundSamples = await Promise.all([
+          generateSampleViaAPI(currentPrompt, round),
+          generateSampleViaAPI(currentPrompt, round),
+          generateSampleViaAPI(currentPrompt, round),
+          generateSampleViaAPI(currentPrompt, round),
+        ]);
+
+        rounds.push(roundSamples);
+        setAllRounds([...rounds]); // Update UI progressively
+
+        // Use first sample's caption for next round (exquisite corpse)
+        if (round < 3 && roundSamples[0]) {
+          currentPrompt = roundSamples[0].caption;
+        }
       }
-      if (!imageResponse.ok) {
-        const errorData = await imageResponse.json();
-        throw new Error(errorData.error || "Failed to generate image");
-      }
 
-      // Parse results
-      const [audioData, imageData] = await Promise.all([
-        audioResponse.json(),
-        imageResponse.json(),
-      ]);
-
-      // Update state with both results
-      setGeneratedAudio({
-        url: audioData.audio_url,
-        prompt: prompt.trim(),
-      });
-      setGeneratedImage({
-        url: imageData.image_url,
-        prompt: prompt.trim(),
-      });
+      setCurrentRound(null); // Generation complete
     } catch (err) {
       console.error("Generation failed:", err);
       setError(err instanceof Error ? err.message : "Generation failed");
+      setCurrentRound(null);
     } finally {
       setIsGenerating(false);
     }
@@ -78,6 +69,8 @@ export default function Home() {
     setPrompt(example);
     setError(null);
   };
+
+  const progress = currentRound !== null ? ((currentRound + 1) / 4) * 100 : 0;
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8 transition-colors duration-1000">
@@ -122,12 +115,23 @@ export default function Home() {
               {isGenerating ? "Generating..." : "Generate"}
             </Button>
           </div>
-          {isGenerating && (
-            <p className="text-sm text-muted-foreground mt-4 animate-pulse">
-              Generating audio and image... this may take 20-30 seconds
-            </p>
+          {isGenerating && currentRound !== null && (
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  Round {currentRound + 1} of 4: {getRoundName(currentRound)}
+                </span>
+                <span className="text-muted-foreground">
+                  {Math.round(progress)}%
+                </span>
+              </div>
+              <Progress value={progress} className="h-2" />
+              <p className="text-xs text-muted-foreground">
+                Generating 4 samples... this takes ~30 seconds per round
+              </p>
+            </div>
           )}
-          {!isGenerating && !generatedAudio && (
+          {!isGenerating && allRounds.length === 0 && (
             <div className="mt-4">
               <p className="text-xs text-muted-foreground mb-2">Try an example:</p>
               <div className="flex flex-wrap gap-2">
@@ -181,48 +185,60 @@ export default function Home() {
         </Card>
       )}
 
-      {/* Output Display */}
-      <div className="max-w-4xl w-full">
-        {generatedAudio && generatedImage ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Audio Output */}
-            <Card className="border-2 shadow-lg">
-              <CardHeader>
-                <CardTitle>Generated Audio</CardTitle>
-                <CardDescription className="text-sm italic">
-                  &quot;{generatedAudio.prompt}&quot;
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <audio
-                  controls
-                  src={generatedAudio.url}
-                  className="w-full"
-                >
-                  Your browser does not support the audio element.
-                </audio>
-              </CardContent>
-            </Card>
-
-            {/* Image Output */}
-            <Card className="border-2 shadow-lg">
-              <CardHeader>
-                <CardTitle>Generated Image</CardTitle>
-                <CardDescription className="text-sm italic">
-                  &quot;{generatedImage.prompt}&quot;
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-muted">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={generatedImage.url}
-                    alt={generatedImage.prompt}
-                    className="w-full h-full object-cover"
-                  />
+      {/* Output Display - 4 Round Grid */}
+      <div className="w-full max-w-7xl">
+        {allRounds.length > 0 ? (
+          <div className="space-y-8">
+            {allRounds.map((roundSamples, roundIdx) => (
+              <div key={roundIdx}>
+                <div className="flex items-center gap-3 mb-4">
+                  <Badge
+                    variant="outline"
+                    className={`text-${getRoundColor(roundIdx)}`}
+                  >
+                    Round {roundIdx + 1}
+                  </Badge>
+                  <h3 className="text-2xl font-bold">{getRoundName(roundIdx)}</h3>
                 </div>
-              </CardContent>
-            </Card>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {roundSamples.map((sample, sampleIdx) => (
+                    <Card key={sampleIdx} className="border-2">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm">Sample {sampleIdx + 1}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {/* Image */}
+                        <div className="relative w-full aspect-square rounded overflow-hidden bg-muted">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={sample.imageUrl}
+                            alt={`Round ${roundIdx + 1} Sample ${sampleIdx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+
+                        {/* Audio */}
+                        <audio
+                          controls
+                          src={sample.audioUrl}
+                          className="w-full h-8"
+                        >
+                          Your browser does not support audio.
+                        </audio>
+
+                        {/* Caption for next round */}
+                        {sampleIdx === 0 && roundIdx < 3 && (
+                          <p className="text-xs text-muted-foreground italic">
+                            Next: &quot;{sample.caption.slice(0, 50)}...&quot;
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <Card className="border-dashed border-2 bg-muted/10">
@@ -242,7 +258,7 @@ export default function Home() {
                   />
                 </svg>
                 <p className="text-lg font-medium">No generations yet</p>
-                <p className="text-sm">Enter a prompt above to begin the corruption</p>
+                <p className="text-sm">Enter a prompt above to watch it decay through 4 rounds</p>
               </div>
             </CardContent>
           </Card>
