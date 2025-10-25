@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,7 @@ export default function Home() {
   const [currentRound, setCurrentRound] = useState<number | null>(null);
   const [allRounds, setAllRounds] = useState<GenerationResult[][]>([]);
   const [error, setError] = useState<string | null>(null);
+  const isGeneratingRef = useRef(false); // Prevent double-clicks
 
   const EXAMPLE_PROMPTS = [
     "cheerful music box melody",
@@ -23,8 +24,9 @@ export default function Home() {
   ];
 
   const handleGenerate = async () => {
-    if (!prompt.trim()) return;
+    if (!prompt.trim() || isGeneratingRef.current) return;
 
+    isGeneratingRef.current = true;
     setIsGenerating(true);
     setAllRounds([]);
     setError(null);
@@ -50,11 +52,6 @@ export default function Home() {
             const updatedRounds = [...rounds];
             updatedRounds[round] = [...roundSamples];
             setAllRounds(updatedRounds);
-
-            // Small delay to avoid rate limits (500ms between samples)
-            if (i < 3) {
-              await new Promise(resolve => setTimeout(resolve, 500));
-            }
           } catch (err) {
             console.error(`Failed to generate sample ${i + 1}:`, err);
             // Continue with other samples even if one fails
@@ -82,6 +79,7 @@ export default function Home() {
       setCurrentRound(null);
     } finally {
       setIsGenerating(false);
+      isGeneratingRef.current = false;
     }
   };
 
@@ -163,7 +161,7 @@ export default function Home() {
               </div>
               <Progress value={progress} className="h-2" />
               <p className="text-xs text-muted-foreground">
-                Generating sample... this takes ~30-45 seconds per round
+                Generating sample... this takes ~45-60 seconds per round (free tier limits)
               </p>
             </div>
           )}

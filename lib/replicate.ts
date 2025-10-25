@@ -100,14 +100,13 @@ export async function generateAudio(
 ): Promise<AudioGenerationOutput> {
   return withRetry(async () => {
     const output = await replicate.run(
-      "meta/musicgen:671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb",
+      "meta/musicgen:b05b1dff1d8c6dc63d14b0cdb42135378dcb87f6373b0d3d341ede46e59e2b38",
       {
         input: {
           prompt,
-          duration: 8, // 8-second samples for hackathon speed
-          model_version: "stereo-large",
+          duration: 8,
+          model_version: "stereo-melody-large",
           output_format: "mp3",
-          normalization_strategy: "peak",
         },
       }
     ) as unknown as string;

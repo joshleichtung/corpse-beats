@@ -51,8 +51,8 @@ export async function generateSampleViaAPI(
 
       const audioData = await audioResponse.json();
 
-      // Small delay before image generation
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // FREE TIER: Wait 15 seconds between API calls (6/minute limit)
+      await new Promise(resolve => setTimeout(resolve, 15000));
 
       const imageResponse = await fetch("/api/generate-image", {
         method: "POST",
@@ -71,8 +71,8 @@ export async function generateSampleViaAPI(
 
       const imageData = await imageResponse.json();
 
-      // Small delay before captioning
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // FREE TIER: Wait 15 seconds before captioning
+      await new Promise(resolve => setTimeout(resolve, 15000));
 
       // Caption the generated image
       const captionResponse = await fetch("/api/caption-image", {
