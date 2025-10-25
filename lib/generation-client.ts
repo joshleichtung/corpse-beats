@@ -4,7 +4,7 @@
  * Browser-safe functions for calling generation APIs
  */
 
-import { enhanceAudioPrompt } from "./prompt-engineering";
+import { enhanceAudioPrompt, enhanceImagePrompt } from "./prompt-engineering";
 
 export interface GenerationResult {
   audioUrl: string;
@@ -23,8 +23,9 @@ export async function generateSampleViaAPI(
   prompt: string,
   round: number
 ): Promise<GenerationResult> {
-  // Enhance prompt client-side
+  // Enhance prompts client-side - separate for audio and image
   const audioPrompt = enhanceAudioPrompt(prompt, round);
+  const imagePrompt = enhanceImagePrompt(prompt, round);
 
   // Retry configuration
   const maxRetries = 3;
@@ -57,7 +58,7 @@ export async function generateSampleViaAPI(
       const imageResponse = await fetch("/api/generate-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: audioPrompt }),
+        body: JSON.stringify({ prompt: imagePrompt }),
       });
 
       if (!imageResponse.ok) {

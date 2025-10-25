@@ -109,10 +109,10 @@ export function getImageModifiers(round: number): string {
   const validRound = Math.max(0, Math.min(3, round)) as CorruptionRound;
 
   const modifiers: Record<CorruptionRound, string> = {
-    0: "pastel colors, soft lighting, dreamy",
-    1: "faded colors, dim lighting, eerie",
-    2: "dark shadows, bruised colors, menacing",
-    3: "blood red, pitch black, grotesque",
+    0: "pastel pink and blue tones, soft dreamy lighting, whimsical and innocent, kawaii aesthetic, gentle watercolor style",
+    1: "faded wilted colors, dusty rose and sage, slightly unsettling, off-kilter composition, creepy cute, vintage photograph deteriorating",
+    2: "dark bruised purple shadows, sickly greenish tinge, ominous atmosphere, gothic horror aesthetic, deeply unsettling imagery, dread and foreboding",
+    3: "blood red splatter, pitch black voids, grotesque disturbing imagery, nightmarish horror, visceral and terrifying, maximum corruption and decay",
   };
 
   return modifiers[validRound];
