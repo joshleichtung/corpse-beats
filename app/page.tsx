@@ -72,8 +72,24 @@ export default function Home() {
 
   const progress = currentRound !== null ? ((currentRound + 1) / 4) * 100 : 0;
 
+  // Determine background color based on current/completed round
+  const getBackgroundColor = () => {
+    if (isGenerating && currentRound !== null) {
+      // During generation, use current round's color
+      const colors = ["bg-pastel-pink", "bg-dusty-rose", "bg-bruised-plum", "bg-blood-red"];
+      return colors[currentRound];
+    }
+    if (allRounds.length > 0) {
+      // After generation, use the last completed round's color
+      const colors = ["bg-pastel-pink", "bg-dusty-rose", "bg-bruised-plum", "bg-blood-red"];
+      return colors[Math.min(allRounds.length - 1, 3)];
+    }
+    // Default to pastel pink
+    return "bg-pastel-pink";
+  };
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-8 transition-colors duration-1000">
+    <main className={`flex min-h-screen flex-col items-center justify-center p-8 transition-colors duration-1000 ${getBackgroundColor()}`}>
       {/* Header */}
       <div className="max-w-4xl w-full mb-12 text-center">
         <h1 className="text-7xl font-bold mb-4 text-near-black tracking-tight">
