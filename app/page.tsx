@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from "@/components/ui/carousel";
 import { generateSampleViaAPI, type GenerationResult } from "@/lib/generation-client";
 import { getRoundName, getRoundColor } from "@/lib/corruption";
 
@@ -15,7 +16,15 @@ export default function Home() {
   const [currentRound, setCurrentRound] = useState<number | null>(null);
   const [allRounds, setAllRounds] = useState<GenerationResult[][]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>();
   const isGeneratingRef = useRef(false); // Prevent double-clicks
+
+  // Auto-scroll carousel to the latest round
+  useEffect(() => {
+    if (carouselApi && allRounds.length > 0) {
+      carouselApi.scrollTo(allRounds.length - 1);
+    }
+  }, [allRounds.length, carouselApi]);
 
   const EXAMPLE_PROMPTS = [
     "cheerful music box melody",
@@ -219,62 +228,65 @@ export default function Home() {
         </Card>
       )}
 
-      {/* Output Display - 4 Round Grid */}
-      <div className="w-full max-w-7xl">
+      {/* Output Display - Carousel */}
+      <div className="w-full max-w-4xl">
         {allRounds.length > 0 ? (
-          <div className="space-y-8">
-            {allRounds.map((roundSamples, roundIdx) => (
-              <div key={roundIdx}>
-                <div className="flex items-center gap-3 mb-4">
-                  <Badge
-                    variant="outline"
-                    className={`text-${getRoundColor(roundIdx)}`}
-                  >
-                    Round {roundIdx + 1}
-                  </Badge>
-                  <h3 className="text-2xl font-bold">{getRoundName(roundIdx)}</h3>
-                </div>
+          <Carousel setApi={setCarouselApi} className="w-full">
+            <CarouselContent>
+              {allRounds.map((roundSamples, roundIdx) => (
+                <CarouselItem key={roundIdx}>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-center gap-3 mb-6">
+                      <Badge
+                        variant="outline"
+                        className={`text-${getRoundColor(roundIdx)}`}
+                      >
+                        Round {roundIdx + 1} of 4
+                      </Badge>
+                      <h3 className="text-3xl font-bold">{getRoundName(roundIdx)}</h3>
+                    </div>
 
-                <div className="grid grid-cols-1 gap-4">
-                  {roundSamples.map((sample, sampleIdx) => (
-                    <Card key={sampleIdx} className="border-2">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-sm">Sample {sampleIdx + 1}</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        {/* Image */}
-                        <div className="relative w-full aspect-square rounded overflow-hidden bg-muted">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={sample.imageUrl}
-                            alt={`Round ${roundIdx + 1} Sample ${sampleIdx + 1}`}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
+                    {roundSamples.map((sample, sampleIdx) => (
+                      <Card key={sampleIdx} className="border-2">
+                        <CardContent className="pt-6 space-y-4">
+                          {/* Image */}
+                          <div className="relative w-full aspect-square rounded overflow-hidden bg-muted max-w-2xl mx-auto">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={sample.imageUrl}
+                              alt={`Round ${roundIdx + 1} Sample ${sampleIdx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
 
-                        {/* Audio */}
-                        <audio
-                          controls
-                          autoPlay
-                          src={sample.audioUrl}
-                          className="w-full h-8"
-                        >
-                          Your browser does not support audio.
-                        </audio>
+                          {/* Audio */}
+                          <audio
+                            controls
+                            autoPlay
+                            src={sample.audioUrl}
+                            className="w-full h-10"
+                          >
+                            Your browser does not support audio.
+                          </audio>
 
-                        {/* Caption for next round */}
-                        {sampleIdx === 0 && roundIdx < 3 && (
-                          <p className="text-xs text-muted-foreground italic">
-                            Next: &quot;{sample.caption.slice(0, 50)}...&quot;
-                          </p>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+                          {/* Caption for next round */}
+                          {sampleIdx === 0 && roundIdx < 3 && (
+                            <div className="text-center">
+                              <p className="text-sm text-muted-foreground">
+                                <span className="font-semibold">Next round prompt:</span> &quot;{sample.caption}&quot;
+                              </p>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+            <CarouselPrevious />
+            <CarouselNext />
+          </Carousel>
         ) : (
           <Card className="border-dashed border-2 bg-muted/10">
             <CardContent className="p-12 text-center">
