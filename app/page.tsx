@@ -19,6 +19,8 @@ export default function Home() {
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const isGeneratingRef = useRef(false); // Prevent double-clicks
   const audioRefs = useRef<Map<number, HTMLAudioElement>>(new Map());
   const pendingAdvanceRef = useRef<number | null>(null);
@@ -114,6 +116,8 @@ export default function Home() {
     setAllRounds([]);
     setError(null);
     setCurrentRound(0);
+    setGeneratedVideoUrl(null);
+    setIsGeneratingVideo(false);
 
     try {
       const rounds: GenerationResult[][] = [];
@@ -169,6 +173,51 @@ export default function Home() {
   const handleExampleClick = (example: string) => {
     setPrompt(example);
     setError(null);
+  };
+
+  const handleGenerateVideo = async () => {
+    if (allRounds.length !== 4 || isGeneratingVideo) return;
+
+    setIsGeneratingVideo(true);
+    setError(null);
+
+    try {
+      // Collect all image URLs and captions from rounds
+      const imageUrls = allRounds.map(roundSamples => roundSamples[0].imageUrl);
+      const captions = allRounds.map(roundSamples => roundSamples[0].caption);
+
+      const response = await fetch('/api/generate-video', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ imageUrls, captions }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Video generation failed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      setGeneratedVideoUrl(data.videoUrl);
+    } catch (err) {
+      console.error("Video generation failed:", err);
+      setError(err instanceof Error ? err.message : "Video generation failed");
+    } finally {
+      setIsGeneratingVideo(false);
+    }
+  };
+
+  const handleDownloadVideo = () => {
+    if (!generatedVideoUrl) return;
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const link = document.createElement('a');
+    link.href = generatedVideoUrl;
+    link.download = `corpse-beats-${timestamp}.mp4`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const progress = currentRound !== null ? ((currentRound + 1) / 4) * 100 : 0;
@@ -305,67 +354,171 @@ export default function Home() {
       {/* Output Display - Carousel */}
       <div className="w-full max-w-4xl">
         {allRounds.length > 0 ? (
-          <Carousel setApi={setCarouselApi} className="w-full">
-            <CarouselContent>
-              {allRounds.map((roundSamples, roundIdx) => (
-                <CarouselItem key={roundIdx}>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-center gap-3 mb-6">
-                      <Badge
-                        variant="outline"
-                        className={`text-${getRoundColor(roundIdx)}`}
-                      >
-                        Round {roundIdx + 1} of 4
-                      </Badge>
-                      <h3 className="text-3xl font-bold">{getRoundName(roundIdx)}</h3>
-                    </div>
+          <>
+            <Carousel setApi={setCarouselApi} className="w-full">
+              <CarouselContent>
+                {allRounds.map((roundSamples, roundIdx) => (
+                  <CarouselItem key={roundIdx}>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-center gap-3 mb-6">
+                        <Badge
+                          variant="outline"
+                          className={`text-${getRoundColor(roundIdx)}`}
+                        >
+                          Round {roundIdx + 1} of 4
+                        </Badge>
+                        <h3 className="text-3xl font-bold">{getRoundName(roundIdx)}</h3>
+                      </div>
 
-                    {roundSamples.map((sample, sampleIdx) => (
-                      <Card key={sampleIdx} className="border-2">
-                        <CardContent className="pt-6 space-y-4">
-                          {/* Image */}
-                          <div className="relative w-full aspect-square rounded overflow-hidden bg-muted max-w-2xl mx-auto">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={sample.imageUrl}
-                              alt={`Round ${roundIdx + 1} Sample ${sampleIdx + 1}`}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-
-                          {/* Audio */}
-                          <audio
-                            ref={(el) => {
-                              if (el) audioRefs.current.set(roundIdx, el);
-                            }}
-                            controls
-                            src={sample.audioUrl}
-                            className="w-full h-10"
-                            onPlay={handleAudioPlay}
-                            onPause={handleAudioPause}
-                            onEnded={() => handleAudioEnded(roundIdx)}
-                          >
-                            Your browser does not support audio.
-                          </audio>
-
-                          {/* Caption for next round */}
-                          {sampleIdx === 0 && roundIdx < 3 && (
-                            <div className="text-center">
-                              <p className="text-sm text-muted-foreground">
-                                <span className="font-semibold">Next round prompt:</span> &quot;{sample.caption}&quot;
-                              </p>
+                      {roundSamples.map((sample, sampleIdx) => (
+                        <Card key={sampleIdx} className="border-2">
+                          <CardContent className="pt-6 space-y-4">
+                            {/* Image */}
+                            <div className="relative w-full aspect-square rounded overflow-hidden bg-muted max-w-2xl mx-auto">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={sample.imageUrl}
+                                alt={`Round ${roundIdx + 1} Sample ${sampleIdx + 1}`}
+                                className="w-full h-full object-cover"
+                              />
                             </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </CarouselItem>
-              ))}
-            </CarouselContent>
-            <CarouselPrevious />
-            <CarouselNext />
-          </Carousel>
+
+                            {/* Audio */}
+                            <audio
+                              ref={(el) => {
+                                if (el) audioRefs.current.set(roundIdx, el);
+                              }}
+                              controls
+                              src={sample.audioUrl}
+                              className="w-full h-10"
+                              onPlay={handleAudioPlay}
+                              onPause={handleAudioPause}
+                              onEnded={() => handleAudioEnded(roundIdx)}
+                            >
+                              Your browser does not support audio.
+                            </audio>
+
+                            {/* Caption for next round */}
+                            {sampleIdx === 0 && roundIdx < 3 && (
+                              <div className="text-center">
+                                <p className="text-sm text-muted-foreground">
+                                  <span className="font-semibold">Next round prompt:</span> &quot;{sample.caption}&quot;
+                                </p>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious />
+              <CarouselNext />
+            </Carousel>
+
+            {/* Video Generation Section */}
+            {allRounds.length === 4 && !generatedVideoUrl && (
+              <div className="mt-8 flex justify-center">
+                <Card className="w-full max-w-2xl border-2">
+                  <CardContent className="pt-6">
+                    <div className="text-center space-y-4">
+                      <h3 className="text-xl font-bold">Ready to Create Your Final Video</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Combine all 4 rounds into a single video showing the complete musical decay
+                      </p>
+                      <Button
+                        onClick={handleGenerateVideo}
+                        disabled={isGeneratingVideo}
+                        size="lg"
+                        className="px-8"
+                      >
+                        {isGeneratingVideo ? (
+                          <>
+                            <svg
+                              className="animate-spin -ml-1 mr-3 h-5 w-5"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              />
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              />
+                            </svg>
+                            Generating video...
+                          </>
+                        ) : (
+                          'Generate Final Video'
+                        )}
+                      </Button>
+                      {isGeneratingVideo && (
+                        <p className="text-xs text-muted-foreground">
+                          This may take 2-3 minutes...
+                        </p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Video Player Section */}
+            {generatedVideoUrl && (
+              <div className="mt-8">
+                <Card className="w-full max-w-2xl mx-auto border-2">
+                  <CardHeader>
+                    <CardTitle className="text-2xl text-center">Your Corpse Beats Video</CardTitle>
+                    <CardDescription className="text-center">
+                      Watch the complete descent into madness
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <video
+                      controls
+                      autoPlay
+                      className="w-full rounded-lg"
+                      src={generatedVideoUrl}
+                    >
+                      Your browser does not support video playback.
+                    </video>
+                    <div className="flex justify-center">
+                      <Button
+                        onClick={handleDownloadVideo}
+                        variant="outline"
+                        size="lg"
+                        className="px-8"
+                      >
+                        <svg
+                          className="w-5 h-5 mr-2"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                          />
+                        </svg>
+                        Download Video
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </>
         ) : (
           <Card className="border-dashed border-2 bg-muted/10">
             <CardContent className="p-12 text-center">
