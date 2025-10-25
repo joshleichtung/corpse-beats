@@ -8,15 +8,40 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedImage, setGeneratedImage] = useState<{url: string, prompt: string} | null>(null);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
 
     setIsGenerating(true);
-    // Generation logic will be implemented in Story 1.4
-    setTimeout(() => {
+    setGeneratedImage(null);
+
+    try {
+      // Call image generation API
+      const response = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ prompt: prompt.trim() }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to generate image");
+      }
+
+      const data = await response.json();
+      setGeneratedImage({
+        url: data.image_url,
+        prompt: prompt.trim(),
+      });
+    } catch (error) {
+      console.error("Generation failed:", error);
+      alert(error instanceof Error ? error.message : "Failed to generate image");
+    } finally {
       setIsGenerating(false);
-    }, 2000);
+    }
   };
 
   return (
@@ -70,29 +95,50 @@ export default function Home() {
         </CardContent>
       </Card>
 
-      {/* Output Placeholder */}
+      {/* Output Display */}
       <div className="max-w-4xl w-full">
-        <Card className="border-dashed border-2 bg-muted/10">
-          <CardContent className="p-12 text-center">
-            <div className="flex flex-col items-center gap-4 text-muted-foreground">
-              <svg
-                className="w-16 h-16 opacity-50"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+        {generatedImage ? (
+          <Card className="border-2 shadow-lg">
+            <CardHeader>
+              <CardTitle>Generated Image</CardTitle>
+              <CardDescription className="text-sm italic">
+                &quot;{generatedImage.prompt}&quot;
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-muted">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={generatedImage.url}
+                  alt={generatedImage.prompt}
+                  className="w-full h-full object-cover"
                 />
-              </svg>
-              <p className="text-lg font-medium">No generations yet</p>
-              <p className="text-sm">Enter a prompt above to begin the corruption</p>
-            </div>
-          </CardContent>
-        </Card>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-dashed border-2 bg-muted/10">
+            <CardContent className="p-12 text-center">
+              <div className="flex flex-col items-center gap-4 text-muted-foreground">
+                <svg
+                  className="w-16 h-16 opacity-50"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+                  />
+                </svg>
+                <p className="text-lg font-medium">No generations yet</p>
+                <p className="text-sm">Enter a prompt above to begin the corruption</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Footer */}
