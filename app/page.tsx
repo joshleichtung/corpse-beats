@@ -246,7 +246,7 @@ export default function Home() {
       />
 
       {/* Content with higher z-index */}
-      <div className="relative z-10 w-full">
+      <div className="relative z-10 w-full flex flex-col items-center">
       {/* Header */}
       <div className="max-w-4xl w-full mb-12 text-center">
         <h1 className="text-7xl font-bold mb-4 text-near-black tracking-tight">
