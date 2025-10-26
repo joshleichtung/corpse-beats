@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from "@/components/ui/carousel";
 import { generateSampleViaAPI, type GenerationResult } from "@/lib/generation-client";
 import { getRoundName, getRoundColor } from "@/lib/corruption";
+import { HorrorBackground } from "@/components/horror-background";
 
 export default function Home() {
   const [prompt, setPrompt] = useState("");
@@ -237,7 +238,15 @@ export default function Home() {
   };
 
   return (
-    <main className={`flex min-h-screen flex-col items-center justify-center p-8 transition-colors duration-1000 ${getBackgroundColor()}`}>
+    <main className={`flex min-h-screen flex-col items-center justify-center p-8 transition-colors duration-1000 ${getBackgroundColor()} relative`}>
+      {/* Animated horror background */}
+      <HorrorBackground
+        round={currentRound !== null ? currentRound : (allRounds.length > 0 ? allRounds.length - 1 : 0)}
+        isGenerating={isGenerating}
+      />
+
+      {/* Content with higher z-index */}
+      <div className="relative z-10 w-full">
       {/* Header */}
       <div className="max-w-4xl w-full mb-12 text-center">
         <h1 className="text-7xl font-bold mb-4 text-near-black tracking-tight">
@@ -546,6 +555,7 @@ export default function Home() {
       <footer className="mt-12 text-center text-sm text-near-black/40">
         <p>Built for Dumb Things AI Hackathon</p>
       </footer>
+      </div>
     </main>
   );
 }
