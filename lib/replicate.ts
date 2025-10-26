@@ -170,8 +170,8 @@ export async function captionImage(imageUrl: string): Promise<ImageCaptionOutput
 }
 
 /**
- * Generate videos from images using Kling v2.1 image-to-video model
- * Creates a video for each image showing the corruption progression
+ * Generate a single video from the final horror image using Kling v2.1
+ * Uses the last (most corrupted) image to create the final video
  */
 export async function generateVideo(
   imageUrls: string[],
@@ -185,37 +185,31 @@ export async function generateVideo(
     throw new Error("At least one image is required for video generation");
   }
 
-  // Generate videos for each image in parallel
-  const videoPromises = imageUrls.map(async (imageUrl, index) => {
-    const corruptionStage = ["pastel innocence", "subtle distortion", "unsettling transformation", "complete horror"][index] || "transformation";
-    const caption = captions[index];
+  // Use the LAST image (maximum horror) for video generation
+  const finalImageUrl = imageUrls[imageUrls.length - 1];
+  const finalCaption = captions[captions.length - 1];
 
-    // Craft prompt describing the corruption arc
-    const prompt = `${caption}. Subtle movement and animation showing ${corruptionStage}. Smooth, cinematic motion with atmospheric depth.`;
+  // Craft prompt emphasizing the horror transformation
+  const prompt = `${finalCaption}. Nightmarish horror transformation with subtle unsettling movement. Dark atmospheric cinematography with eerie depth and ominous mood.`;
 
-    return withRetry(async () => {
-      const output = await replicate.run(
-        "kwaivgi/kling-v2.1:8f1d07f812d87339d7866c94ba2149e8ee456472e5c5ec04ac22795e21b55c68",
-        {
-          input: {
-            prompt,
-            start_image: imageUrl,
-            mode: "standard", // 720p for cost efficiency
-            duration: 5, // 5 seconds per clip
-          },
-        }
-      ) as unknown as string;
+  const videoUrl = await withRetry(async () => {
+    const output = await replicate.run(
+      "kwaivgi/kling-v2.1:8f1d07f812d87339d7866c94ba2149e8ee456472e5c5ec04ac22795e21b55c68",
+      {
+        input: {
+          prompt,
+          start_image: finalImageUrl,
+          mode: "standard", // 720p for cost efficiency
+          duration: 5, // 5 seconds
+        },
+      }
+    ) as unknown as string;
 
-      // Kling returns video URL as string
-      return output;
-    }, `Video generation for image ${index + 1}: "${caption}"`);
-  });
-
-  // Wait for all videos to complete
-  const videoUrls = await Promise.all(videoPromises);
+    return output;
+  }, `Video generation from final horror image: "${finalCaption}"`);
 
   return {
-    video_urls: videoUrls,
+    video_urls: [videoUrl], // Single video in array for consistency
   };
 }
 

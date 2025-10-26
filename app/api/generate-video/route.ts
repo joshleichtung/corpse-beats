@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { generateVideo } from "@/lib/replicate";
 
+// Increase timeout for video generation (can take several minutes)
+export const maxDuration = 300; // 5 minutes
+
 export async function POST(request: Request) {
   try {
     const { imageUrls, captions } = await request.json();

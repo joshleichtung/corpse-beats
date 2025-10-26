@@ -196,7 +196,8 @@ export default function Home() {
       }
 
       const data = await response.json();
-      setGeneratedVideoUrl(data.videoUrl);
+      // API returns array of video URLs, use the first one
+      setGeneratedVideoUrl(data.videoUrls[0]);
     } catch (err) {
       console.error("Video generation failed:", err);
       setError(err instanceof Error ? err.message : "Video generation failed");
@@ -221,15 +222,15 @@ export default function Home() {
 
   // Determine background color based on current/completed round
   const getBackgroundColor = () => {
+    const colors = ["bg-pastel-pink", "bg-dusty-rose", "bg-bruised-plum", "bg-blood-red"];
+
     if (isGenerating && currentRound !== null) {
       // During generation, use current round's color
-      const colors = ["bg-pastel-pink", "bg-dusty-rose", "bg-bruised-plum", "bg-blood-red"];
       return colors[currentRound];
     }
     if (allRounds.length > 0) {
-      // After generation, use the last completed round's color
-      const colors = ["bg-pastel-pink", "bg-dusty-rose", "bg-bruised-plum", "bg-blood-red"];
-      return colors[Math.min(allRounds.length - 1, 3)];
+      // After generation, use the current carousel slide's color
+      return colors[Math.min(currentSlideIndex, 3)];
     }
     // Default to pastel pink
     return "bg-pastel-pink";
