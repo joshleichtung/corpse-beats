@@ -100,9 +100,54 @@
 
 ---
 
-## Credits & License
-- Powered by [Replicate](https://replicate.com/) models and Tone.js
-- Designed, implemented, and documented during Dumb Things AI Hackathon 2025
-- MIT License – see `LICENSE`
+## Sponsors & Credits
+
+### 🙏 Special Thanks
+
+**[Replicate](https://replicate.com/)** - Core AI infrastructure sponsor
+- Provides the API platform powering all four AI models
+- Seamless model orchestration with automatic scaling
+- Developer-friendly API with excellent TypeScript support
+- Free tier perfect for hackathon prototyping
+
+**[DigitalOcean](https://www.digitalocean.com/)** - Hosting & deployment sponsor
+- App Platform for automated GitHub deployments
+- Server-side rendering support for Next.js API routes
+- Environment variable management for secure API tokens
+- Live at: https://corpsebeats-5zrnj.ondigitalocean.app/
+
+### 🤖 AI Models (via Replicate)
+
+**Meta MusicGen** (`meta/musicgen:b05b1dff...`)
+- 8-second stereo audio generation
+- Model: `stereo-melody-large` (highest quality)
+- Powers the musical corruption from cheerful to nightmarish
+
+**Black Forest Labs Flux Schnell** (`black-forest-labs/flux-schnell:c846a699...`)
+- Ultra-fast image generation (1-4 inference steps)
+- 1:1 aspect ratio for carousel display
+- Transforms audio-inspired prompts into pastel-horror visuals
+
+**Salesforce BLIP** (`salesforce/blip:2e1dddc8...`)
+- Image-to-text captioning model
+- The "exquisite corpse" connector between rounds
+- Interprets generated images as new prompts for mutation
+
+**Kuaishou Kling v2.1** (`kwaivgi/kling-v2.1:8f1d07f8...`)
+- Image-to-video generation (720p, 5 seconds)
+- Brings final horror image to life with cinematic movement
+- Standard mode for cost-efficient quality
+
+### 🛠️ Built With
+- **[Next.js](https://nextjs.org/)** - React framework for production
+- **[shadcn/ui](https://ui.shadcn.com/)** - Beautiful component library
+- **[Tailwind CSS](https://tailwindcss.com/)** - Utility-first styling
+- **[Embla Carousel](https://www.embla-carousel.com/)** - Smooth carousel navigation
+- **[Tone.js](https://tonejs.github.io/)** - Web Audio sequencing
+
+### 📄 License
+MIT License – see `LICENSE`
+
+---
 
 *Happy corrupting!* 🎵👻
